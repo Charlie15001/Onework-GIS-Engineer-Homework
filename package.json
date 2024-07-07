@@ -1,0 +1,30 @@
+{
+  "name": "nuxt-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "cesium": "^1.119.0",
+    "copy-webpack-plugin": "^12.0.2",
+    "nuxt": "^3.12.3",
+    "prismjs": "^1.29.0",
+    "sass": "^1.77.6",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.12.0",
+    "@types/prismjs": "^1.26.4",
+    "autoprefixer": "^10.4.19",
+    "mapbox-gl": "^3.5.1",
+    "nuxt-mapbox": "^1.6.0",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.4",
+    "vite-plugin-cesium": "^1.2.22"
+  }
+}
