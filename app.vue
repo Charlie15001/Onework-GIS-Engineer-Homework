@@ -1,8 +1,3 @@
-<script setup lang="ts">
-const { coord } = useFoo();
-coord();
-</script>
-
 <template>
   <div>
     <NuxtLayout>

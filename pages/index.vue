@@ -1,30 +1,52 @@
 <script setup lang="ts">
-// import Alert from '~/components/Alert.vue';
-// import Profile from './events/profile.vue';
 // The URL on your server where CesiumJS's static files are hosted.
 import { Cartesian3, createOsmBuildingsAsync, Math as CesiumMath, ImageryLayer, Ion, OpenStreetMapImageryProvider, Terrain, Viewer } from 'cesium';
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
-// Get the current position of the device
-navigator.geolocation.getCurrentPosition((position) => {
-   console.log(position.coords.latitude, position.coords.longitude);
-   const coord_lat = position.coords.latitude;
-   const coord_long = position.coords.longitude;
-});
+// const options = {
+//   enableHighAccuracy: true,
+//   timeout: 5000,
+//   maximumAge: 0,
+// };
 
+// function success(pos) {
+//   const crd = pos.coords;
+
+//   console.log("Your current position is:");
+//   console.log(`Latitude : ${crd.latitude}`);
+//   console.log(`Longitude: ${crd.longitude}`);
+//   console.log(`More or less ${crd.accuracy} meters.`);
+
+//   current_pos.push({
+//    lat: crd.latitude, 
+//    long: crd.longitude
+//   })
+
+// }
+
+// function error(err) {
+//   console.warn(`ERROR(${err.code}): ${err.message}`);
+// }
+
+// window.onload = function getLocation() {
+//     if (navigator.geolocation) {
+//         // navigator.geolocation.getCurrentPosition(showPosition);
+//         navigator.geolocation.getCurrentPosition(success, error, options);
+//     }
+// }
 </script>
 
 <template>
      <div class="Main">
          <!-- <Header></Header> -->
-         <div class="cesiumViewer">
+         <!-- <div class="cesiumViewer">
             <Cesium></Cesium>
-         </div>
+         </div> -->
 
-         <div class="mapboxViewer">
+         <!-- <div class="mapboxViewer">
             <Mapbox></Mapbox>
-         </div>
-         
+         </div> -->
+         <Mapbox></Mapbox>
          <!-- Show user's current location -->
          <!-- <Location/> -->
      </div>

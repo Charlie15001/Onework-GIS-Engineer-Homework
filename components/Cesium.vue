@@ -1,6 +1,9 @@
 <script lang="ts">
 import { Cartesian3, createOsmBuildingsAsync, Math as CesiumMath, ImageryLayer, Ion, OpenStreetMapImageryProvider, Terrain, Viewer } from 'cesium';
 import "cesium/Build/Cesium/Widgets/widgets.css";
+import { useCameraState } from '@/composables/useCameraState';
+
+const { cameraState } = useCameraState();
 
 export default {
   mounted() {
@@ -26,12 +29,30 @@ export default {
       }
    });
 
-   viewer.camera.changed.addEventListener(function() {
-    var deg = Math.round(CesiumMath.toDegrees(viewer.camera.heading))
-    console.log('Heading: ', deg)
-    var deg = Math.round(CesiumMath.toDegrees(viewer.camera.pitch))
-    console.log('Pitch: ', deg)
+   viewer.camera.changed.addEventListener(() => {
+      const { longitude, latitude, height } = viewer.camera.positionCartographic
+      const heading = CesiumMath.toDegrees(viewer.camera.heading)
+      const pitch = CesiumMath.toDegrees(viewer.camera.pitch)
+      const roll = CesiumMath.toDegrees(viewer.camera.roll)
+
+      cameraState.lng = CesiumMath.toDegrees(longitude)
+      cameraState.lat = CesiumMath.toDegrees(latitude)
+      cameraState.height = height
+      cameraState.heading = heading
+      cameraState.pitch = pitch
+      cameraState.roll = roll
    });
+
+   watch(cameraState, (newState) => {
+    viewer.camera.setView({
+      destination: Cartesian3.fromDegrees(newState.lng, newState.lat, newState.height),
+      orientation: {
+        heading: CesiumMath.toRadians(newState.heading),
+        pitch: CesiumMath.toRadians(newState.pitch),
+        roll: CesiumMath.toRadians(newState.roll),
+      },
+    })
+  })
 
   }
 }
