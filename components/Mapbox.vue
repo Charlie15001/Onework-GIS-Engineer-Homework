@@ -1,32 +1,19 @@
 <script setup lang="ts">
 import { Cartesian3, createOsmBuildingsAsync, Math as CesiumMath, ImageryLayer, Ion, OpenStreetMapImageryProvider, Terrain, Viewer } from 'cesium';
-import "cesium/Build/Cesium/Widgets/widgets.css";
-import bikeData from '~/assets/data/youbike_immediate.json' // Import the JSON file
-import mapboxgl from 'mapbox-gl';
-import "mapbox-gl/dist/mapbox-gl.css";
+import mapboxgl from 'mapbox-gl'
 import { useCameraState } from '@/composables/useCameraState'
 import { useFetch } from '@vueuse/core'
 
-const { cameraState } = useCameraState()
+// Import css
+import "cesium/Build/Cesium/Widgets/widgets.css"
+import "mapbox-gl/dist/mapbox-gl.css"
+// Import the JSON file
+import bikeData from '~/assets/data/youbike_immediate.json'
+// Import utils
+import transformToGeoJSON from '~/utils/transformToGeoJSON'
+import { getUserLocation } from '~/utils'
 
-function transformToGeoJSON(data) {
-    const geoJSON = {
-        type: "FeatureCollection", 
-        features: data.map(item => ({
-            type: "Feature", 
-            geometry: {
-                type: "Point", 
-                coordinates: [item.longitude, item.latitude]
-            }, 
-            properties: {
-                name_ch: item.sna,
-                name_en: item.snaen, 
-                address: item.ar
-            }
-        })),
-    }
-    return geoJSON
-}
+const { cameraState } = useCameraState()
 
 const geoJSONData = transformToGeoJSON(bikeData)
 
@@ -42,21 +29,30 @@ const initializeCesium = (lng, lat) => {
       orientation: {
          heading: CesiumMath.toRadians(cameraState.heading),
          pitch: CesiumMath.toRadians(cameraState.pitch),
+         roll: CesiumMath.toDegrees(cameraState.roll)
       }
    });
 
    viewer.camera.changed.addEventListener(() => {
       const { longitude, latitude, height } = viewer.camera.positionCartographic
+      const heading = CesiumMath.toDegrees(viewer.camera.heading)
+      const pitch = CesiumMath.toDegrees(viewer.camera.pitch)
 
       cameraState.lng = CesiumMath.toDegrees(longitude)
       cameraState.lat = CesiumMath.toDegrees(latitude)
       cameraState.height = height
       cameraState.zoom = Math.log2(44330000 / height) // Approximation to convert height to zoom level
+      cameraState.heading = heading
+      cameraState.pitch = pitch
    });
 
    watch(cameraState, (newState) => {
     viewer.camera.setView({
       destination: Cartesian3.fromDegrees(newState.lng, newState.lat, newState.height),
+      orientation: {
+        heading: CesiumMath.toRadians(newState.heading), 
+        pitch: CesiumMath.toRadians(newState.pitch), 
+      }
     })
   })
 }
@@ -91,6 +87,8 @@ const initializeMapbox = (lng, lat) => {
     map.jumpTo({
       center: [newState.lng, newState.lat],
       zoom: newState.zoom,
+      bearing: newState.heading,
+      pitch: newState.pitch,
     })
   })
 
@@ -161,21 +159,6 @@ const initializeMapbox = (lng, lat) => {
     .addTo(map)
     .setPopup(popup);
 
-}
-
-const getUserLocation = () => {
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lng = position.coords.longitude
-        const lat = position.coords.latitude
-        resolve({ lng, lat })
-      },
-      (error) => {
-        reject(error)
-      }
-    )
-  })
 }
 
 onMounted(async () => {
