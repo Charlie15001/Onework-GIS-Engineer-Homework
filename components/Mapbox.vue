@@ -1,12 +1,34 @@
 <script setup lang="ts">
 import { Cartesian3, createOsmBuildingsAsync, Math as CesiumMath, ImageryLayer, Ion, OpenStreetMapImageryProvider, Terrain, Viewer } from 'cesium';
 import "cesium/Build/Cesium/Widgets/widgets.css";
-
+import bikeData from '~/assets/data/youbike_immediate.json' // Import the JSON file
 import mapboxgl from 'mapbox-gl';
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useCameraState } from '@/composables/useCameraState'
+import { useFetch } from '@vueuse/core'
 
 const { cameraState } = useCameraState()
+
+function transformToGeoJSON(data) {
+    const geoJSON = {
+        type: "FeatureCollection", 
+        features: data.map(item => ({
+            type: "Feature", 
+            geometry: {
+                type: "Point", 
+                coordinates: [item.longitude, item.latitude]
+            }, 
+            properties: {
+                name_ch: item.sna,
+                name_en: item.snaen, 
+                address: item.ar
+            }
+        })),
+    }
+    return geoJSON
+}
+
+const geoJSONData = transformToGeoJSON(bikeData)
 
 const initializeCesium = (lng, lat) => {
   Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjYmQ3ZmRmOC0xMWY1LTRjMjEtYTcxZS1lMjMyM2IyYzcwNDUiLCJpZCI6MjI2Mzk2LCJpYXQiOjE3MjAwODYwMjF9.EHL6IlDKMLngNDqCMHTarf0nZPOCp_Jp3KHWskMK3NA'
@@ -87,6 +109,48 @@ const initializeMapbox = (lng, lat) => {
       })
   );
 
+  // Show bike stations
+  map.on('load', () => {
+    map.loadImage(
+        'https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png',
+        (error, image) => {
+            if (error) throw error;
+
+            // Add the image to the map style.
+            map.addImage('custom-marker', image);
+
+            map.addSource('points', {
+            type: 'geojson',
+            data: geoJSONData,
+            cluster: true
+            })
+
+            map.addLayer({
+            id: 'points',
+            type: 'symbol',
+            source: 'points',
+            // paint: {
+            // 'circle-radius': 6,
+            // 'circle-color': '#B42222',
+            // },
+            layout: {
+                'icon-image': 'custom-marker', 
+                'icon-size': 0.5, 
+                // get the station name from the source's "name" property
+                'text-field': ['get', 'name_en'], 
+                'text-font': [
+                    'Open Sans Semibold',
+                    'Arial Unicode MS Bold'
+                ],
+                'text-offset': [0, 1.25],
+                'text-anchor': 'top', 
+                'text-size': 12
+            }
+          })
+        }
+    );
+  })
+
   var popup = new mapboxgl.Popup()
     .setHTML('<h1>Current Position</h1>')
     .addTo(map);
@@ -119,6 +183,19 @@ onMounted(async () => {
     const { lng, lat } = await getUserLocation()
     initializeMapbox(lng, lat)
     initializeCesium(lng, lat)
+
+    const { data: jsonData, isFetching, error } = useFetch('assets/data/youbike_immediate.json')
+
+    if (isFetching.value) return
+
+    if (error.value) {
+      console.error('Failed to load JSON data:', error.value)
+      return
+    }
+
+    const data = jsonData.value
+    console.log(data);
+
   } catch (error) {
     console.error('Error getting user location:', error)
     const defaultLng = -74.5
@@ -127,17 +204,6 @@ onMounted(async () => {
     initializeCesium(defaultLng, defaultLat)
   }
 })
-
-// onMounted(()=>{
-//     const map = new mapboxgl.Map({
-//         accessToken: 'pk.eyJ1IjoiY2hhcmxpZTE1MDAxIiwiYSI6ImNseWI2cjY5dTB2Ym0yanF3dWFhM3lzaGgifQ.H-XYHkcUG289Yj0cndv8TA',
-//         container: 'map', // container ID
-//         // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
-//         style: 'mapbox://styles/mapbox/streets-v12', // style URL
-//         center: [-74.5, 40], // starting position
-//         zoom: 9 // starting zoom
-//     });
-// })
 </script>
 
 <style scoped>
