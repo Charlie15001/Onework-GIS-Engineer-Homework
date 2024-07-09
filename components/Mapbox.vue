@@ -75,7 +75,7 @@ const { cameraState } = useCameraState()
 const { currentLocation } = useCurrentLocation()
 
 const geoJSONData = transformToGeoJSON(bikeData)
-console.log(geoJSONData)
+// console.log(geoJSONData)
 
 const naviButton = ref(null)
 
@@ -86,7 +86,6 @@ const startNavi = () => {
 
 // Access the button element after the component has been mounted
 onMounted(() => {
-  console.log(point([-74.0059, 40.7128]));
   if (naviButton.value) {
     // Example of setting an attribute directly
     naviButton.value.setAttribute('data-custom-attr', 'exampleValue')
@@ -322,6 +321,9 @@ const initializeMapbox = (lng, lat) => {
           })
         }
     )
+    // Show the nearest bike station on the map
+    map.addImage('pulsing-dot', pulsingDot, { pixelRatio: 2 });
+    
     // make an initial directions request that
     // starts and ends at the same location
     getRoute(map, start_coords, start_coords);
@@ -351,7 +353,24 @@ const initializeMapbox = (lng, lat) => {
         'circle-color': '#3887be'
       }
     });
-    // this is where the code from the next step will go
+    
+    // Find the nearest bike station to the starting point
+    const targetPoint = point(start_coords)
+    const nearest = nearestPoint(targetPoint, geoJSONData)
+    const nearest_lng = nearest['geometry']['coordinates'][0]
+    const nearest_lat = nearest['geometry']['coordinates'][1]
+    console.log('Nearest Point to the starting point: ', nearest)
+
+    var popup2 = new mapboxgl.Popup()
+      .setText('Nearest Station to Current Location')
+      .addTo(map)
+    
+    // Add the bike station nearest to the starting point to the map
+    // Create a default Marker, colored black, rotated 45 degrees.
+    const nearestStart_marker = new mapboxgl.Marker({ color: 'black' })
+        .setLngLat([nearest_lng, nearest_lat])
+        .addTo(map)
+        .setPopup(popup2);
   })
 
   map.on('click', (event) => {
@@ -402,12 +421,12 @@ const initializeMapbox = (lng, lat) => {
     console.log('End point: ', coords)
     destination.value = coords
 
-    // Find the nearest bike station
+    // Find the nearest bike station to the end point
     const targetPoint = point(coords)
     const nearest = nearestPoint(targetPoint, geoJSONData)
     const nearest_lng = nearest['geometry']['coordinates'][0]
     const nearest_lat = nearest['geometry']['coordinates'][1]
-    console.log('Nearest Point:', nearest)
+    console.log('Nearest Point to the end point: ', nearest)
 
     const end_dot = {
       type: 'FeatureCollection',
@@ -423,8 +442,8 @@ const initializeMapbox = (lng, lat) => {
       ]
     }
 
-    // Show the nearest bike station on the map
-    map.addImage('pulsing-dot', pulsingDot, { pixelRatio: 2 });
+    // // Show the nearest bike station on the map
+    // map.addImage('pulsing-dot', pulsingDot, { pixelRatio: 2 });
 
     if (map.getLayer('layer-with-pulsing-dot')) {
       map.getSource('layer-with-pulsing-dot').setData(end_dot);
@@ -456,15 +475,16 @@ const initializeMapbox = (lng, lat) => {
     }
   });
 
-  var popup = new mapboxgl.Popup()
-    .setHTML('<h1>Current Position</h1>')
+  var popup1 = new mapboxgl.Popup()
+    .setHTML('<h1>Current Location</h1>')
     .addTo(map);
 
   // Create a default Marker and add it to the map.
-  const marker1 = new mapboxgl.Marker()
+  // Show current location
+  const currentLocation_marker = new mapboxgl.Marker()
     .setLngLat([lng, lat])
     .addTo(map)
-    .setPopup(popup);
+    .setPopup(popup1);
 
 }
 
