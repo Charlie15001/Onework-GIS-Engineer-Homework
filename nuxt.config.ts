@@ -61,7 +61,7 @@ export default defineNuxtConfig({
   },
 
   modules: [
-    'nuxt-mapbox'
+    'nuxt-mapbox', 
   ], 
 
   mapbox: {

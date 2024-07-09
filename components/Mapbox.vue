@@ -13,9 +13,10 @@ import "mapbox-gl/dist/mapbox-gl.css"
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
 // Import the JSON file
 import bikeData from '~/assets/data/youbike_immediate.json'
+// import osmData from '~/static/geojson/osm_buildings.geojson'
 // Import utils
 import transformToGeoJSON from '~/utils/transformToGeoJSON'
-import { getUserLocation } from '~/utils'
+import { getUserLocation, filterBuildingsWithHeight } from '~/utils'
 
 const mapboxAccessToken = 'pk.eyJ1IjoiY2hhcmxpZTE1MDAxIiwiYSI6ImNseWI2cjY5dTB2Ym0yanF3dWFhM3lzaGgifQ.H-XYHkcUG289Yj0cndv8TA'
 
@@ -23,6 +24,18 @@ const mapboxAccessToken = 'pk.eyJ1IjoiY2hhcmxpZTE1MDAxIiwiYSI6ImNseWI2cjY5dTB2Ym
 // which is a reactive reference that you can use to store a value or a DOM element.
 const geocoderContainer = ref(null)
 const destination = ref(null)
+
+async function getOsmBuildings() {
+  // Load GeoJSON data from the local public directory
+  const response = await fetch('/osm_buildings.geojson')
+  // const response = await fetch('/osm_buildings_test.geojson')
+  const geojson = await response.json()
+  return geojson
+}
+
+const osmData = await getOsmBuildings()
+const osmDataWithHeight = filterBuildingsWithHeight(osmData);
+// console.log(osmDataWithHeight)
 
 // create a function to make a directions request
 async function getRoute(viewer, start, end) {
@@ -85,7 +98,7 @@ const startNavi = () => {
 }
 
 // Access the button element after the component has been mounted
-onMounted(() => {
+onMounted(() => {  
   if (naviButton.value) {
     // Example of setting an attribute directly
     naviButton.value.setAttribute('data-custom-attr', 'exampleValue')
@@ -268,7 +281,7 @@ const initializeMapbox = (lng, lat) => {
         accessToken: mapboxAccessToken,
         mapboxgl: mapboxgl, 
         marker: true, // Add marker on geocode result
-        placeholder: 'Search for places', // Placeholder text in the search bar
+        placeholder: 'Search for Destination', // Placeholder text in the search bar
     });
 
   // Add the geocoder to the geocoderContainer
@@ -371,6 +384,58 @@ const initializeMapbox = (lng, lat) => {
         .setLngLat([nearest_lng, nearest_lat])
         .addTo(map)
         .setPopup(popup2);
+
+    // Add the GeoJSON data of OSM buildings as a source
+    map.addSource('geojson-data', {
+      type: 'geojson',
+      // data: osmData
+      data: osmDataWithHeight
+    });
+
+    // Add a 3D layer for the GeoJSON data
+    map.addLayer({
+      id: '3d-buildings', 
+      source: 'geojson-data',
+      type: 'fill-extrusion', 
+      paint: {
+        // Get `fill-extrusion-height` from the source `height` property.
+        'fill-extrusion-height': ['get', 'height'],
+
+        // Make extrusions slightly opaque to see through indoor walls.
+        'fill-extrusion-opacity': 0.5
+      }
+    })
+
+    // map.addSource('floorplan', {
+    //         'type': 'geojson',
+    //         /*
+    //          * Each feature in this GeoJSON file contains values for
+    //          * `properties.height`, `properties.base_height`,
+    //          * and `properties.color`.
+    //          * In `addLayer` you will use expressions to set the new
+    //          * layer's paint properties based on these values.
+    //          */
+    //         'data': 'https://docs.mapbox.com/mapbox-gl-js/assets/indoor-3d-map.geojson'
+    //     });
+    //     map.addLayer({
+    //         'id': 'room-extrusion',
+    //         'type': 'fill-extrusion',
+    //         'source': 'floorplan',
+    //         'paint': {
+    //             // Get the `fill-extrusion-color` from the source `color` property.
+    //             'fill-extrusion-color': ['get', 'color'],
+
+    //             // Get `fill-extrusion-height` from the source `height` property.
+    //             'fill-extrusion-height': ['get', 'height'],
+
+    //             // Get `fill-extrusion-base` from the source `base_height` property.
+    //             'fill-extrusion-base': ['get', 'base_height'],
+
+    //             // Make extrusions slightly opaque to see through indoor walls.
+    //             'fill-extrusion-opacity': 0.5
+    //         }
+    //     });
+
   })
 
   map.on('click', (event) => {
@@ -532,14 +597,17 @@ onMounted(async () => {
   width: 100%;
   height: 400px;
 }
+.geocoder {
+  margin: 10px;
+}
 </style>
 
 <template>
-    <h1>Search for your destination:</h1>
-    <div ref="geocoderContainer"></div>
     <div>
       <!-- <button ref="naviButton">Start Navigation</button> -->
        <h1>Click your destination on the mapbox viewer</h1>
+       <!-- Place geocoderContainer inside Mapbox viewer -->
+       <div ref="geocoderContainer" class="geocoder"></div>
     </div>
     <div class="cesiumViewer">
       <h1>Cesium Viewer</h1>
