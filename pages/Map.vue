@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import "mapbox-gl/dist/mapbox-gl.css";
 import bikeData from '~/assets/data/youbike_immediate.json' // Import the JSON file
 import jsonData from '~/assets/data/data.json' // Import the JSON file
+import { point, featureCollection, nearestPoint } from '@turf/turf'
 
 const mapboxAccessToken = 'pk.eyJ1IjoiY2hhcmxpZTE1MDAxIiwiYSI6ImNseWI2cjY5dTB2Ym0yanF3dWFhM3lzaGgifQ.H-XYHkcUG289Yj0cndv8TA'
 
@@ -47,7 +48,29 @@ const geoJSONData = transformToGeoJSON(bikeData)
 // console.log(JSON.stringify(geoJSONData, null, 2))
 
 export default {
+    data() {
+        return {
+        points: [
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3]
+        ],
+        targetPoint: [1.5, 1.5]
+        };
+    },
+    computed: {
+        nearestPoint() {
+        const target = point(this.targetPoint);
+        const points = this.points.map(p => point(p));
+        const pointCollection = featureCollection(points);
+        const nearest = nearestPoint(target, pointCollection);
+        return nearest;
+        }
+    },
+
     mounted () {
+        console.log('Nearest Point:', this.nearestPoint);
         const map = new mapboxgl.Map({
         accessToken: mapboxAccessToken,
         container: 'map', // container ID

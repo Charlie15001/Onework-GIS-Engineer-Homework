@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { Cartesian3, createOsmBuildingsAsync, Math as CesiumMath, ImageryLayer, Ion, OpenStreetMapImageryProvider, Terrain, Viewer } from 'cesium';
 import mapboxgl from 'mapbox-gl'
+import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder'
+import { point, nearestPoint } from '@turf/turf'
 import { useCameraState } from '@/composables/useCameraState'
+import { useCurrentLocation } from '~/composables/useCoordinates';
 import { useFetch } from '@vueuse/core'
 
 // Import css
 import "cesium/Build/Cesium/Widgets/widgets.css"
 import "mapbox-gl/dist/mapbox-gl.css"
+import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
 // Import the JSON file
 import bikeData from '~/assets/data/youbike_immediate.json'
 // Import utils
@@ -14,6 +18,11 @@ import transformToGeoJSON from '~/utils/transformToGeoJSON'
 import { getUserLocation } from '~/utils'
 
 const mapboxAccessToken = 'pk.eyJ1IjoiY2hhcmxpZTE1MDAxIiwiYSI6ImNseWI2cjY5dTB2Ym0yanF3dWFhM3lzaGgifQ.H-XYHkcUG289Yj0cndv8TA'
+
+// ref(null) creates a reactive reference with an initial value of null, 
+// which is a reactive reference that you can use to store a value or a DOM element.
+const geocoderContainer = ref(null)
+const destination = ref(null)
 
 // create a function to make a directions request
 async function getRoute(viewer, start, end) {
@@ -63,8 +72,35 @@ async function getRoute(viewer, start, end) {
 }
 
 const { cameraState } = useCameraState()
+const { currentLocation } = useCurrentLocation()
 
 const geoJSONData = transformToGeoJSON(bikeData)
+console.log(geoJSONData)
+
+const naviButton = ref(null)
+
+const startNavi = () => {
+  console.log('Button was clicked!')
+  // Additional logic for the button click event
+}
+
+// Access the button element after the component has been mounted
+onMounted(() => {
+  console.log(point([-74.0059, 40.7128]));
+  if (naviButton.value) {
+    // Example of setting an attribute directly
+    naviButton.value.setAttribute('data-custom-attr', 'exampleValue')
+    
+    // Example of adding an event listener
+    naviButton.value.addEventListener('mouseover', () => {
+      console.log('Mouse is over the button!')
+    })
+
+    naviButton.value.addEventListener('click', () => {
+      console.log('Button was clicked!')
+    })
+  }
+})
 
 const initializeCesium = (lng, lat) => {
   Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjYmQ3ZmRmOC0xMWY1LTRjMjEtYTcxZS1lMjMyM2IyYzcwNDUiLCJpZCI6MjI2Mzk2LCJpYXQiOjE3MjAwODYwMjF9.EHL6IlDKMLngNDqCMHTarf0nZPOCp_Jp3KHWskMK3NA'
@@ -118,6 +154,78 @@ const initializeMapbox = (lng, lat) => {
     zoom: cameraState.zoom,
   });
 
+  const size = 200;
+
+  // This implements `StyleImageInterface`
+  // to draw a pulsing dot icon on the map.
+  const pulsingDot = {
+      width: size,
+      height: size,
+      data: new Uint8Array(size * size * 4),
+
+      // When the layer is added to the map,
+      // get the rendering context for the map canvas.
+      onAdd: function () {
+          const canvas = document.createElement('canvas');
+          canvas.width = this.width;
+          canvas.height = this.height;
+          this.context = canvas.getContext('2d');
+      },
+
+      // Call once before every frame where the icon will be used.
+      render: function () {
+          const duration = 1000;
+          const t = (performance.now() % duration) / duration;
+
+          const radius = (size / 2) * 0.3;
+          const outerRadius = (size / 2) * 0.7 * t + radius;
+          const context = this.context;
+
+          // Draw the outer circle.
+          context.clearRect(0, 0, this.width, this.height);
+          context.beginPath();
+          context.arc(
+              this.width / 2,
+              this.height / 2,
+              outerRadius,
+              0,
+              Math.PI * 2
+          );
+          context.fillStyle = `rgba(255, 200, 200, ${1 - t})`;
+          context.fill();
+
+          // Draw the inner circle.
+          context.beginPath();
+          context.arc(
+              this.width / 2,
+              this.height / 2,
+              radius,
+              0,
+              Math.PI * 2
+          );
+          context.fillStyle = 'rgba(255, 100, 100, 1)';
+          context.strokeStyle = 'white';
+          context.lineWidth = 2 + 4 * (1 - t);
+          context.fill();
+          context.stroke();
+
+          // Update this image's data with data from the canvas.
+          this.data = context.getImageData(
+              0,
+              0,
+              this.width,
+              this.height
+          ).data;
+
+          // Continuously repaint the map, resulting
+          // in the smooth animation of the dot.
+          map.triggerRepaint();
+
+          // Return `true` to let the map know that the image was updated.
+          return true;
+      }
+  };
+
   map.on('moveend', () => {
     const center = map.getCenter()
     const zoom = map.getZoom()
@@ -156,6 +264,23 @@ const initializeMapbox = (lng, lat) => {
           showUserHeading: true
       })
   );
+  // Add the control to the map.
+  const geocoder = new MapboxGeocoder({
+        accessToken: mapboxAccessToken,
+        mapboxgl: mapboxgl, 
+        marker: true, // Add marker on geocode result
+        placeholder: 'Search for places', // Placeholder text in the search bar
+    });
+
+  // Add the geocoder to the geocoderContainer
+  geocoderContainer.value.appendChild(geocoder.onAdd(map))
+
+  // Listen for the geocoder result event
+  geocoder.on('result', (event) => {
+    const coordinates = event.result.geometry.coordinates
+    console.log('Coordinates:', coordinates)
+    // Perform actions with the coordinates
+  })
 
   // Show bike stations
   map.on('load', () => {
@@ -275,6 +400,60 @@ const initializeMapbox = (lng, lat) => {
     getRoute(map, start_coords, coords);
     console.log('Start point: ', start_coords)
     console.log('End point: ', coords)
+    destination.value = coords
+
+    // Find the nearest bike station
+    const targetPoint = point(coords)
+    const nearest = nearestPoint(targetPoint, geoJSONData)
+    const nearest_lng = nearest['geometry']['coordinates'][0]
+    const nearest_lat = nearest['geometry']['coordinates'][1]
+    console.log('Nearest Point:', nearest)
+
+    const end_dot = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Point',
+            coordinates: [nearest_lng, nearest_lat] // icon position [lng, lat]
+          }
+        }
+      ]
+    }
+
+    // Show the nearest bike station on the map
+    map.addImage('pulsing-dot', pulsingDot, { pixelRatio: 2 });
+
+    if (map.getLayer('layer-with-pulsing-dot')) {
+      map.getSource('layer-with-pulsing-dot').setData(end_dot);
+    } else {
+      map.addLayer({
+        id: 'layer-with-pulsing-dot',
+        type: 'symbol',
+        source: {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                  type: 'Point',
+                  coordinates: [nearest_lng, nearest_lat] // icon position [lng, lat]
+                }
+              }
+            ]
+          }
+        },
+
+        layout: {
+          'icon-image': 'pulsing-dot', 
+        }
+      });
+    }
   });
 
   var popup = new mapboxgl.Popup()
@@ -336,6 +515,12 @@ onMounted(async () => {
 </style>
 
 <template>
+    <h1>Search for your destination:</h1>
+    <div ref="geocoderContainer"></div>
+    <div>
+      <!-- <button ref="naviButton">Start Navigation</button> -->
+       <h1>Click your destination on the mapbox viewer</h1>
+    </div>
     <div class="cesiumViewer">
       <h1>Cesium Viewer</h1>
       <div class="container" id="cesiumContainer"></div>

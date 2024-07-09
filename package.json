@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@turf/turf": "^7.0.0",
     "cesium": "^1.119.0",
     "copy-webpack-plugin": "^12.0.2",
     "nuxt": "^3.12.3",
