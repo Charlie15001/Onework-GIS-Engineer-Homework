@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Cartesian3, createOsmBuildingsAsync, Math as CesiumMath, ImageryLayer, Ion, OpenStreetMapImageryProvider, Terrain, Viewer } from 'cesium';
+import { Cartesian3, Color, ClassificationType, IonResource, createOsmBuildingsAsync, Math as CesiumMath, ImageryLayer, Ion, OpenStreetMapImageryProvider, Terrain, Viewer, GeoJsonDataSource, SceneMode, SkyBox, WebMercatorProjection } from 'cesium';
 import mapboxgl from 'mapbox-gl'
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder'
 import { point, nearestPoint } from '@turf/turf'
@@ -19,7 +19,7 @@ import transformToGeoJSON from '~/utils/transformToGeoJSON'
 import { getUserLocation, filterBuildingsWithHeight } from '~/utils'
 
 const mapboxAccessToken = 'pk.eyJ1IjoiY2hhcmxpZTE1MDAxIiwiYSI6ImNseWI2cjY5dTB2Ym0yanF3dWFhM3lzaGgifQ.H-XYHkcUG289Yj0cndv8TA'
-
+const osmBuildingsPath = '/osm_buildings_large.geojson'
 // ref(null) creates a reactive reference with an initial value of null, 
 // which is a reactive reference that you can use to store a value or a DOM element.
 const geocoderContainer = ref(null)
@@ -27,15 +27,27 @@ const destination = ref(null)
 
 async function getOsmBuildings() {
   // Load GeoJSON data from the local public directory
-  const response = await fetch('/osm_buildings.geojson')
+  const response = await fetch(osmBuildingsPath)
   // const response = await fetch('/osm_buildings_test.geojson')
   const geojson = await response.json()
   return geojson
 }
 
-const osmData = await getOsmBuildings()
-const osmDataWithHeight = filterBuildingsWithHeight(osmData);
-// console.log(osmDataWithHeight)
+// async function displayBuildings() {
+//   // Load GeoJSON data
+//   const osmBuildings = await getOsmBuildings()
+//     // Filter buildings with height
+//   const osmBuildingsWithHeight = filterBuildingsWithHeight(osmBuildings);
+//   // Load GeoJSON data into Cesium
+//   const geojsonDataSource = await GeoJsonDataSource.load(osmBuildingsWithHeight, {
+//     clampToGround: false
+//   })
+//   return geojsonDataSource
+// }
+
+const osmBuildings = await getOsmBuildings()
+const osmBuildingsWithHeight = filterBuildingsWithHeight(osmBuildings);
+// console.log(osmBuildingsWithHeight)
 
 // create a function to make a directions request
 async function getRoute(viewer, start, end) {
@@ -85,7 +97,6 @@ async function getRoute(viewer, start, end) {
 }
 
 const { cameraState } = useCameraState()
-const { currentLocation } = useCurrentLocation()
 
 const geoJSONData = transformToGeoJSON(bikeData)
 // console.log(geoJSONData)
@@ -118,9 +129,61 @@ const initializeCesium = (lng, lat) => {
   Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjYmQ3ZmRmOC0xMWY1LTRjMjEtYTcxZS1lMjMyM2IyYzcwNDUiLCJpZCI6MjI2Mzk2LCJpYXQiOjE3MjAwODYwMjF9.EHL6IlDKMLngNDqCMHTarf0nZPOCp_Jp3KHWskMK3NA'
   // Initialize the Cesium Viewer in the HTML element with the `cesiumContainer` ID.
   const viewer = new Viewer("cesiumContainer", {
-      terrain: Terrain.fromWorldTerrain(),
+    // Start in Columbus Viewer
+    // sceneMode: SceneMode.COLUMBUS_VIEW,
+    // Use Cesium World Terrain
+    // terrain: Terrain.fromWorldTerrain(),
+    // Hide the base layer picker
+    baseLayerPicker: false,
+    // Use OpenStreetMaps
+    // baseLayer: new ImageryLayer(new OpenStreetMapImageryProvider({
+    //   url: "https://tile.openstreetmap.org/"
+    // })),
+    skyBox: new SkyBox({
+      sources: {
+        positiveX: "stars/TychoSkymapII.t3_08192x04096_80_px.jpg",
+        negativeX: "stars/TychoSkymapII.t3_08192x04096_80_mx.jpg",
+        positiveY: "stars/TychoSkymapII.t3_08192x04096_80_py.jpg",
+        negativeY: "stars/TychoSkymapII.t3_08192x04096_80_my.jpg",
+        positiveZ: "stars/TychoSkymapII.t3_08192x04096_80_pz.jpg",
+        negativeZ: "stars/TychoSkymapII.t3_08192x04096_80_mz.jpg"
+      }
+    }),
+    // Show Columbus View map with Web Mercator projection
+    mapProjection: new WebMercatorProjection()
+  });
+
+  async function loadAndDisplayBuildings() {
+    // Load GeoJSON data
+    const osmBuildings = await getOsmBuildings()
+      // Filter buildings with height
+    const osmBuildingsWithHeight = filterBuildingsWithHeight(osmBuildings);
+    // Load GeoJSON data into Cesium
+    const geojsonDataSource = await GeoJsonDataSource.load(osmBuildingsWithHeight, {
+      clampToGround: false, 
+    })
+    viewer.dataSources.add(geojsonDataSource)
+
+    // Style the buildings with height
+    geojsonDataSource.entities.values.forEach(entity => {
+      if (entity.properties.height) {
+        const height = entity.properties.height.getValue();
+        console.log(height)
+        entity.polygon.extrudedHeight = height;
+        // console.log('extrude height set')
+        entity.polygon.material = Color.WHITE.withAlpha(0.4);
+        // console.log('extrude meterial set')
+        entity.polygon.outline = true;
+        // console.log('extrude outline set')
+        entity.polygon.outlineColor = Color.BLACK;
+        console.log('extrude outline color set')
+      } else {
+        console.log('Unable to set height')
+      }
     });
-  // Fly the camera to San Francisco at the given longitude, latitude, and height.
+  }
+
+  // Fly the camera to the given longitude, latitude, and height.
   viewer.camera.flyTo({
       destination: Cartesian3.fromDegrees(lng, lat, 400),
       orientation: {
@@ -152,6 +215,8 @@ const initializeCesium = (lng, lat) => {
       }
     })
   })
+
+  loadAndDisplayBuildings();
 }
 
 const initializeMapbox = (lng, lat) => {
@@ -389,7 +454,7 @@ const initializeMapbox = (lng, lat) => {
     map.addSource('geojson-data', {
       type: 'geojson',
       // data: osmData
-      data: osmDataWithHeight
+      data: osmBuildingsWithHeight
     });
 
     // Add a 3D layer for the GeoJSON data
@@ -405,37 +470,6 @@ const initializeMapbox = (lng, lat) => {
         'fill-extrusion-opacity': 0.5
       }
     })
-
-    // map.addSource('floorplan', {
-    //         'type': 'geojson',
-    //         /*
-    //          * Each feature in this GeoJSON file contains values for
-    //          * `properties.height`, `properties.base_height`,
-    //          * and `properties.color`.
-    //          * In `addLayer` you will use expressions to set the new
-    //          * layer's paint properties based on these values.
-    //          */
-    //         'data': 'https://docs.mapbox.com/mapbox-gl-js/assets/indoor-3d-map.geojson'
-    //     });
-    //     map.addLayer({
-    //         'id': 'room-extrusion',
-    //         'type': 'fill-extrusion',
-    //         'source': 'floorplan',
-    //         'paint': {
-    //             // Get the `fill-extrusion-color` from the source `color` property.
-    //             'fill-extrusion-color': ['get', 'color'],
-
-    //             // Get `fill-extrusion-height` from the source `height` property.
-    //             'fill-extrusion-height': ['get', 'height'],
-
-    //             // Get `fill-extrusion-base` from the source `base_height` property.
-    //             'fill-extrusion-base': ['get', 'base_height'],
-
-    //             // Make extrusions slightly opaque to see through indoor walls.
-    //             'fill-extrusion-opacity': 0.5
-    //         }
-    //     });
-
   })
 
   map.on('click', (event) => {
