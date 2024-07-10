@@ -3,7 +3,7 @@ import { Cartesian3, Color, ClassificationType, IonResource, createOsmBuildingsA
 import mapboxgl from 'mapbox-gl'
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder'
 import { point, nearestPoint } from '@turf/turf'
-import { useCameraState } from '@/composables/useCameraState'
+import { useCameraState } from '#imports';
 import { useCurrentLocation } from '~/composables/useCoordinates';
 import { useFetch } from '@vueuse/core'
 
@@ -32,18 +32,6 @@ async function getOsmBuildings() {
   const geojson = await response.json()
   return geojson
 }
-
-// async function displayBuildings() {
-//   // Load GeoJSON data
-//   const osmBuildings = await getOsmBuildings()
-//     // Filter buildings with height
-//   const osmBuildingsWithHeight = filterBuildingsWithHeight(osmBuildings);
-//   // Load GeoJSON data into Cesium
-//   const geojsonDataSource = await GeoJsonDataSource.load(osmBuildingsWithHeight, {
-//     clampToGround: false
-//   })
-//   return geojsonDataSource
-// }
 
 const osmBuildings = await getOsmBuildings()
 const osmBuildingsWithHeight = filterBuildingsWithHeight(osmBuildings);
@@ -168,7 +156,7 @@ const initializeCesium = (lng, lat) => {
     geojsonDataSource.entities.values.forEach(entity => {
       if (entity.properties.height) {
         const height = entity.properties.height.getValue();
-        console.log(height)
+        // console.log(height)
         entity.polygon.extrudedHeight = height;
         // console.log('extrude height set')
         entity.polygon.material = Color.WHITE.withAlpha(0.4);
@@ -176,7 +164,7 @@ const initializeCesium = (lng, lat) => {
         entity.polygon.outline = true;
         // console.log('extrude outline set')
         entity.polygon.outlineColor = Color.BLACK;
-        console.log('extrude outline color set')
+        // console.log('extrude outline color set')
       } else {
         console.log('Unable to set height')
       }
@@ -184,6 +172,7 @@ const initializeCesium = (lng, lat) => {
   }
 
   // Fly the camera to the given longitude, latitude, and height.
+  // Set the camera to the given heading, pitch, and roll.
   viewer.camera.flyTo({
       destination: Cartesian3.fromDegrees(lng, lat, 400),
       orientation: {
@@ -345,7 +334,10 @@ const initializeMapbox = (lng, lat) => {
   const geocoder = new MapboxGeocoder({
         accessToken: mapboxAccessToken,
         mapboxgl: mapboxgl, 
-        marker: true, // Add marker on geocode result
+        // Add marker on geocode result
+        marker: {
+          color: 'red' // Set the marker color to red
+        },
         placeholder: 'Search for Destination', // Placeholder text in the search bar
     });
 
@@ -603,7 +595,7 @@ onMounted(async () => {
     }
 
     const data = jsonData.value
-    console.log(data);
+    // console.log(data);
 
   } catch (error) {
     console.error('Error getting user location:', error)
