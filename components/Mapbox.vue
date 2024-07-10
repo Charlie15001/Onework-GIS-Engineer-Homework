@@ -2,7 +2,7 @@
 import { Cartesian3, Color, ClassificationType, IonResource, createOsmBuildingsAsync, Math as CesiumMath, ImageryLayer, Ion, OpenStreetMapImageryProvider, Terrain, Viewer, GeoJsonDataSource, SceneMode, SkyBox, WebMercatorProjection } from 'cesium';
 import mapboxgl from 'mapbox-gl'
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder'
-import { point, nearestPoint } from '@turf/turf'
+import { point, nearestPoint, feature } from '@turf/turf'
 import { useCameraState } from '#imports';
 import { useCurrentLocation } from '~/composables/useCoordinates';
 import { useFetch } from '@vueuse/core'
@@ -307,6 +307,8 @@ const initializeMapbox = (lng, lat) => {
     // Note: Mapbox does not support roll
   })
 
+  // map.on('moveend', updateLayerData)
+
   watch(cameraState, (newState) => {
     map.jumpTo({
       center: [newState.lng, newState.lat],
@@ -354,43 +356,46 @@ const initializeMapbox = (lng, lat) => {
   // Show bike stations
   map.on('load', () => {
     map.loadImage(
-        'https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png',
-        (error, image) => {
-            if (error) throw error;
+      'https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png',
+      (error, image) => {
+          if (error) throw error;
 
-            // Add the image to the map style.
-            map.addImage('custom-marker', image);
+          // Add the image to the map style.
+          map.addImage('custom-marker', image);
 
-            map.addSource('points', {
+          // Add bike stations geoJSON data as a source
+          map.addSource('bike-station', {
             type: 'geojson',
             data: geoJSONData,
             cluster: true
-            })
-
-            map.addLayer({
-            id: 'points',
-            type: 'symbol',
-            source: 'points',
-            // paint: {
-            // 'circle-radius': 6,
-            // 'circle-color': '#B42222',
-            // },
-            layout: {
-                'icon-image': 'custom-marker', 
-                'icon-size': 0.5, 
-                // get the station name from the source's "name" property
-                'text-field': ['get', 'name_en'], 
-                'text-font': [
-                    'Open Sans Semibold',
-                    'Arial Unicode MS Bold'
-                ],
-                'text-offset': [0, 1.25],
-                'text-anchor': 'top', 
-                'text-size': 12
-            }
           })
-        }
-    )
+
+          // Adds a Mapbox style layer for bike stations to the map's style
+          map.addLayer({
+          id: 'layer-of-bike-station',
+          type: 'symbol',
+          source: 'bike-station',
+          layout: {
+              'icon-image': 'custom-marker', 
+              'icon-size': 0.5, 
+              // Get the station English name from the source's "name_en" property
+              'text-field': ['get', 'name_en'], 
+              'text-font': [
+                  'Open Sans Semibold',
+                  'Arial Unicode MS Bold'
+              ],
+              'text-offset': [0, 1.25],
+              'text-anchor': 'top', 
+              'text-size': 12
+          }
+        })
+
+        // Update the layer based on the current map bounds
+        updateLayerData()
+        map.on('moveend', updateLayerData);
+      }
+    );
+
     // Show the nearest bike station on the map
     map.addImage('pulsing-dot', pulsingDot, { pixelRatio: 2 });
     
@@ -398,26 +403,29 @@ const initializeMapbox = (lng, lat) => {
     // starts and ends at the same location
     getRoute(map, start_coords, start_coords);
 
+    // Add the coordinate of starting point as a geoJSON data source
+    map.addSource('start-point', {
+      type: 'geojson', 
+      data: {
+        type: 'FeatureCollection', 
+        features: [
+          {
+            type: 'Feature', 
+            properties: {}, 
+            geometry: {
+              type: 'Point',
+              coordinates: start_coords
+            }
+          }
+        ]
+      }
+    });
+
     // Add starting point to the map
     map.addLayer({
-      id: 'point',
+      id: 'layer-of-start-point',
       type: 'circle',
-      source: {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              properties: {},
-              geometry: {
-                type: 'Point',
-                coordinates: start_coords
-              }
-            }
-          ]
-        }
-      },
+      source: 'start-point', 
       paint: {
         'circle-radius': 10,
         'circle-color': '#3887be'
@@ -442,8 +450,8 @@ const initializeMapbox = (lng, lat) => {
         .addTo(map)
         .setPopup(popup2);
 
-    // Add the GeoJSON data of OSM buildings as a source
-    map.addSource('geojson-data', {
+    // Add of OSM buildings as a GeoJSON data source
+    map.addSource('3d-buildings', {
       type: 'geojson',
       // data: osmData
       data: osmBuildingsWithHeight
@@ -451,8 +459,8 @@ const initializeMapbox = (lng, lat) => {
 
     // Add a 3D layer for the GeoJSON data
     map.addLayer({
-      id: '3d-buildings', 
-      source: 'geojson-data',
+      id: 'layer-of-3d-buildings', 
+      source: '3d-buildings',
       type: 'fill-extrusion', 
       paint: {
         // Get `fill-extrusion-height` from the source `height` property.
@@ -462,7 +470,53 @@ const initializeMapbox = (lng, lat) => {
         'fill-extrusion-opacity': 0.5
       }
     })
-  })
+
+    // Function to update the visible 3D buildings
+    const updateVisibleBuildings = () => {
+      const bounds = map.getBounds()
+      const visibleFeatures = osmBuildingsWithHeight.features.filter(feature => {
+        // Polygons got multiple coordinate pairs
+        // Get the first coordinate pair
+        const coordinates = feature.geometry.coordinates[0][0]
+        return coordinates[0] >= bounds.getWest() &&
+                coordinates[0] <= bounds.getEast() &&
+                coordinates[1] >= bounds.getSouth() &&
+                coordinates[1] <= bounds.getNorth()
+      });
+
+      map.getSource('3d-buildings').setData({
+        type: 'FeatureCollection',
+        features: visibleFeatures
+      })
+
+      console.log(`Reset 3d-buildings-layer with ${visibleFeatures.length} buildings loaded.`)
+    }
+
+    // Update the visible buildings when the map is moved or zoomed
+    map.on('moveend', updateVisibleBuildings)
+    map.on('zoomend', updateVisibleBuildings)
+  });
+
+  // Function to update the visible bike stations
+  function updateLayerData() {
+    const bounds = map.getBounds()
+    const source = map.getSource('bike-station')
+
+    const filteredFeatures = geoJSONData.features.filter(feature => {
+      const [lng, lat] = feature.geometry.coordinates
+      return bounds.contains([lng, lat])
+    })
+
+    const filteredData = {
+      type: 'FeatureCollection', 
+      features: filteredFeatures
+    }
+    // console.log('Create filtered data.')
+
+    source.setData(filteredData)
+    // Check how many bike station are loaded
+    console.log(`Reset bike-station-layer with ${filteredData.features.length} bike stations loaded.`)
+  }
 
   map.on('click', (event) => {
     const coords = Object.keys(event.lngLat).map((key) => event.lngLat[key]);

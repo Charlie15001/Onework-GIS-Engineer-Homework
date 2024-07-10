@@ -66,5 +66,5 @@ export default defineNuxtConfig({
 
   mapbox: {
     accessToken: 'pk.eyJ1IjoiY2hhcmxpZTE1MDAxIiwiYSI6ImNseWI2cjY5dTB2Ym0yanF3dWFhM3lzaGgifQ.H-XYHkcUG289Yj0cndv8TA'
-  }
+  },
 })
